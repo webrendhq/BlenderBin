@@ -1,0 +1,877 @@
+<!DOCTYPE html><!--  Last Published: Thu Sep 12 2024 21:13:35 GMT+0000 (Coordinated Universal Time)  -->
+<html data-wf-page="66b26150a70c22421272385b" data-wf-site="66b26150a70c224212723855">
+<head>
+  <meta charset="utf-8">
+  <title>BlenderBin</title>
+  <meta content="width=device-width, initial-scale=1" name="viewport">
+  <link href="css/normalize.css" rel="stylesheet" type="text/css">
+  <link href="css/components.css" rel="stylesheet" type="text/css">
+  <link href="css/some-blender-plugin-market-49392.css" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin="anonymous">
+  <script src="https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js" type="text/javascript"></script>
+  <script type="text/javascript">WebFont.load({  google: {    families: ["Exo:100,100italic,200,200italic,300,300italic,400,400italic,500,500italic,600,600italic,700,700italic,800,800italic,900,900italic","Varela:400","Inconsolata:400,700","Montserrat:100,100italic,200,200italic,300,300italic,400,400italic,500,500italic,600,600italic,700,700italic,800,800italic,900,900italic","Great Vibes:400"]  }});</script>
+  <script type="text/javascript">!function(o,c){var n=c.documentElement,t=" w-mod-";n.className+=t+"js",("ontouchstart"in o||o.DocumentTouch&&c instanceof DocumentTouch)&&(n.className+=t+"touch")}(window,document);</script>
+  <link href="images/favicon.png" rel="shortcut icon" type="image/x-icon">
+  <link href="images/webclip.png" rel="apple-touch-icon">
+  <link rel="preconnect" href="https://cdn.fonts.net">
+  <link href="https://cdn.fonts.net/kit/9acc24ae-3b6e-46b3-8e4a-791be963aa93/9acc24ae-3b6e-46b3-8e4a-791be963aa93.css" rel="stylesheet">
+  <script type="module">
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  onSnapshot
+} from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+import { getFunctions } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-functions.js";
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDIuu33lWChgE_oTteuAuywPrJwBFiRavM",
+  authDomain: "marv-studio-points-plugin.firebaseapp.com",
+  projectId: "marv-studio-points-plugin",
+  storageBucket: "marv-studio-points-plugin.appspot.com",
+  messagingSenderId: "441089628814",
+  appId: "1:441089628814:web:4b4bc410399ae288bd47df"
+};
+// Initialize Firebase and declare "global" variables
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const functions = getFunctions(app, "us-central1");
+// Identify auth action forms
+let signUpForm = document.getElementById('wf-form-signup-form');
+let signInForm = document.getElementById('wf-form-signin-form');
+let signOutButton = document.getElementById('signout-button');
+let buyBlenderBinButton = document.getElementById('buy-blenderbin-button');
+let downloadBlenderBinButton = document.getElementById('download-blenderbin');
+let cancelSubscriptionButton = document.getElementById('cancel-subscription-button');
+let pluginButtonsMain = document.getElementById('plugin-buttons-main');
+// Assign event listeners, if the elements exist
+if (signUpForm !== null) {
+  signUpForm.addEventListener('submit', handleSignUp, true);
+}
+if (signInForm !== null) {
+  signInForm.addEventListener('submit', handleSignIn, true);
+}
+if (signOutButton !== null) {
+  signOutButton.addEventListener('click', handleSignOut);
+}
+if (buyBlenderBinButton !== null) {
+  buyBlenderBinButton.addEventListener('click', buyBlenderBin);
+}
+if (downloadBlenderBinButton !== null) {
+  downloadBlenderBinButton.addEventListener('click', downloadBlenderBin);
+}
+// Function to get subscription ID from Firestore
+async function getSubscriptionId(user) {
+  try {
+    const subscriptionsRef = collection(db, "customers", user.uid, "subscriptions");
+    const querySnapshot = await getDocs(subscriptionsRef);
+    let subscriptionId = null;
+    console.log(`Retrieved ${querySnapshot.size} documents from subscriptions collection.`);
+    querySnapshot.forEach((doc) => {
+      const subscriptionData = doc.data();
+      console.log("Subscription document data:", subscriptionData);
+      // Check if the status is active and extract the subscription ID from the stripeLink field
+      if (subscriptionData.status === "active" && subscriptionData.stripeLink) {
+        const stripeLink = subscriptionData.stripeLink;
+        // Extract the subscription ID from the stripeLink URL
+        const urlParts = stripeLink.split('/');
+        subscriptionId = urlParts[urlParts.length - 1]; // Get the last part of the URL
+        console.log(`Extracted subscription ID: ${subscriptionId}`);
+      }
+    });
+    if (!subscriptionId) {
+      throw new Error('No active subscription found.');
+    }
+    return subscriptionId;
+  } catch (error) {
+    console.error('Error getting subscription ID:', error);
+    throw error;
+  }
+}
+// Custom error messages based on Firebase error codes
+function getCustomErrorMessage(errorCode) {
+  switch (errorCode) {
+    case 'auth/user-not-found':
+      return 'Account does not exist or Password is incorrect. Please try again.';
+    case 'auth/wrong-password':
+      return 'Account does not exist or Password is incorrect. Please try again.';
+    case 'auth/email-already-in-use':
+      return 'The email address is already in use by another account.';
+    case 'auth/weak-password':
+      return 'The password is too weak. Please choose a stronger password.';
+    case 'auth/invalid-email':
+      return 'The email address is not valid. Please enter a correct email.';
+    default:
+      return 'An unexpected error occurred. Please try again.';
+  }
+}
+// Handle signUp
+function handleSignUp(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const email = document.getElementById('signup-email').value;
+  const password = document.getElementById('signup-password').value;
+  createUserWithEmailAndPassword(auth, email, password)
+    .then((userCredential) => {
+      const user = userCredential.user;
+      console.log('User successfully created: ' + user.email);
+      window.location.href = "https://blenderbin.com";
+    })
+    .catch((error) => {
+      const errorCode = error.code;
+      const errorMessage = getCustomErrorMessage(errorCode);
+      var errorText = document.getElementById('signup-error-message');
+      errorText.innerHTML = errorMessage;
+    });
+}
+// Handle signIn
+function handleSignIn(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const email = document.getElementById('signin-email').value;
+  const password = document.getElementById('signin-password').value;
+  signInWithEmailAndPassword(auth, email, password)
+    .then((userCredential) => {
+      const user = userCredential.user;
+      console.log('User logged in: ' + user.email);
+      window.location.href = "https://blenderbin.com";
+    })
+    .catch((error) => {
+      const errorCode = error.code;
+      const errorMessage = getCustomErrorMessage(errorCode);
+      var errorText = document.getElementById('signin-error-message');
+      errorText.innerHTML = errorMessage;
+    });
+}
+// Handle signOut
+function handleSignOut() {
+  signOut(auth).then(() => {
+    console.log('User signed out');
+    window.location.reload();
+  }).catch((error) => {
+    const errorMessage = error.message;
+    console.log(errorMessage);
+  });
+}
+// Assign event listeners, if the elements exist
+if (cancelSubscriptionButton !== null) {
+  cancelSubscriptionButton.addEventListener('click', async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('User is not authenticated.');
+      }
+      const subscriptionId = await getSubscriptionId(user); // Get the subscription ID from Firestore
+      await cancelSubscription(subscriptionId); // Cancel the subscription using the retrieved ID
+      // Reload the window after successful subscription cancellation
+      window.location.reload();
+    } catch (error) {
+      console.error('Error during subscription cancellation:', error);
+    }
+  });
+}
+// Function to cancel subscription
+async function cancelSubscription(subscriptionId) {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User is not authenticated.');
+    }
+    const idToken = await user.getIdToken();
+    const response = await fetch(
+      'https://us-central1-marv-studio-points-plugin.cloudfunctions.net/cancelSubscription',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ subscriptionId: subscriptionId }),
+      }
+    );
+    const result = await response.json();
+    console.log(result.message);
+    // Return the result for handling after subscription cancellation
+    return result;
+  } catch (error) {
+    console.error('Error canceling subscription:', error);
+    throw error;
+  }
+}
+// Function to get Checkout URL
+export const getCheckoutUrl = async function(app, priceId) {
+  const auth = getAuth(app);
+  const userId = auth.currentUser?.uid;
+  if (!userId) throw new Error("User is not authenticated");
+  const checkoutSessionRef = collection(
+    db,
+    "customers",
+    userId,
+    "checkout_sessions"
+  );
+  const docRef = await addDoc(checkoutSessionRef, {
+    price: priceId,
+    success_url: window.location.origin,
+    cancel_url: window.location.origin,
+  });
+  return new Promise(function(resolve, reject) {
+    const unsubscribe = onSnapshot(docRef, function(snap) {
+      const { error, url } = snap.data();
+      if (error) {
+        unsubscribe();
+        reject(new Error(`An error occurred: ${error.message}`));
+      }
+      if (url) {
+        console.log("Stripe Checkout URL:", url);
+        unsubscribe();
+        resolve(url);
+      }
+    });
+  });
+};
+// Function to get Portal URL
+export const getPortalUrl = async function(app) {
+  const user = auth.currentUser;
+  try {
+    const functionRef = httpsCallable(
+      functions,
+      "ext-firestore-stripe-payments-createPortalLink"
+    );
+    const { data } = await functionRef({
+      customerId: user?.uid,
+      returnUrl: window.location.origin,
+    });
+    console.log("Reroute to Stripe portal: ", data.url);
+    return data.url;
+  } catch (error) {
+    console.error(error);
+    throw new Error("No url returned");
+  }
+};
+// Function to check subscription status
+async function checkSubscriptionStatus(user, priceId) {
+  try {
+    const subscriptionsRef = collection(db, "customers", user.uid, "subscriptions");
+    const querySnapshot = await getDocs(subscriptionsRef);
+    let isSubscribed = false;
+    querySnapshot.forEach((doc) => {
+      const subscriptionData = doc.data();
+      if (subscriptionData.items.some(item => item.price.id === priceId) && subscriptionData.status === "active") {
+        isSubscribed = true;
+      }
+    });
+    return isSubscribed;
+  } catch (error) {
+    console.error('Error checking subscription status:', error);
+    return false;
+  }
+}
+// Function to download BlenderBin
+async function downloadBlenderBin() {
+  try {
+    const url = "https://blenderbin.s3.us-east-2.amazonaws.com/BlenderBin+1.0.0.zip";
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = 'BlenderBin 1.0.0.zip';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    console.log('Download initiated successfully.');
+  } catch (error) {
+    console.error('Error downloading BlenderBin:', error);
+  }
+}
+// Function to buy BlenderBin
+function buyBlenderBin() {
+  const buyBlenderBinNow = async () => {
+    try {
+      const priceId = "price_1Pe0T0GLCrtq5FJQe55KG3nv";
+      const checkoutUrl = await getCheckoutUrl(app, priceId);
+      window.location.href = checkoutUrl;
+      console.log("Bought BlenderBin.");
+    } catch (error) {
+      console.error('Error during BlenderBin purchase:', error);
+    }
+  };
+  buyBlenderBinNow();
+}
+// Listen for auth state changes
+onAuthStateChanged(auth, async (user) => {
+  let publicElements = document.querySelectorAll("[data-onlogin='hide']");
+  let privateElements = document.querySelectorAll("[data-onlogin='show']");
+  let subscribedElements = document.querySelectorAll("[data-issubscribed='true']");
+  let notSubscribedElements = document.querySelectorAll("[data-issubscribed='false']");
+  if (user) {
+    const uid = user.uid;
+    privateElements.forEach(function(element) {
+      element.style.display = "flex";
+    });
+    publicElements.forEach(function(element) {
+      element.style.display = "none";
+    });
+    const priceId = "price_1Pe0T0GLCrtq5FJQe55KG3nv";
+    const isSubscribed = await checkSubscriptionStatus(user, priceId);
+    if (isSubscribed) {
+      subscribedElements.forEach(function(element) {
+        element.style.display = "flex";
+      });
+      notSubscribedElements.forEach(function(element) {
+        element.style.display = "none";
+      });
+      if (pluginButtonsMain) {
+        try {
+          const downloadButton = document.createElement('button');
+          downloadButton.innerText = 'Download';
+          downloadButton.style.borderRadius = '50px';
+          downloadButton.style.backgroundColor = '#0a0a5c';
+          downloadButton.style.color = '#ffffff';
+          downloadButton.style.padding = '10px 20px';
+          downloadButton.style.border = 'none';
+          downloadButton.style.cursor = 'pointer';
+          downloadButton.style.fontFamily = 'HelveticaNowDisplayBold';
+          downloadButton.setAttribute('data-onlogin', 'flex');
+          downloadButton.setAttribute('data-issubscribed', 'true');
+          downloadButton.addEventListener('click', downloadBlenderBin);
+          pluginButtonsMain.appendChild(downloadButton);
+          console.log('Download button added successfully.');
+        } catch (error) {
+          console.error('Error adding download button:', error);
+        }
+      } else {
+        console.error('plugin-buttons-main element not found.');
+      }
+    } else {
+      subscribedElements.forEach(function(element) {
+        element.style.display = "none";
+      });
+      notSubscribedElements.forEach(function(element) {
+        element.style.display = "flex";
+      });
+    }
+    console.log(`The current user's UID is equal to ${uid}`);
+  } else {
+    publicElements.forEach(function(element) {
+      element.style.display = "flex";
+    });
+    privateElements.forEach(function(element) {
+      element.style.display = "none";
+    });
+    subscribedElements.forEach(function(element) {
+      element.style.display = "none";
+    });
+    notSubscribedElements.forEach(function(element) {
+      element.style.display = "flex";
+    });
+  }
+});
+</script>
+  <style>
+  /* For WebKit browsers (Chrome, Safari) */
+  ::-webkit-scrollbar {
+    width: 12px; /* Adjust the width of the scrollbar */
+  }
+  ::-webkit-scrollbar-track {
+    background: #000; /* Black background for the track */
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #333; /* Dark grey for the thumb */
+    border-radius: 10px; /* Rounded corners for the thumb */
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555; /* Slightly lighter grey when hovered */
+  }
+  /* For Firefox */
+  html {
+    scrollbar-width: thin; /* Make the scrollbar thin */
+    scrollbar-color: #333 #000; /* Thumb color, Track color */
+  }
+  /* For Internet Explorer and Edge */
+  * {
+    scrollbar-color: #333 #000; /* Thumb color, Track color */
+    scrollbar-width: thin; /* Make the scrollbar thin */
+  }
+</style>
+</head>
+<body data-w-id="66b26150a70c224212723860" class="body">
+  <div class="blenderbin-logo"></div>
+  <div style="display:none;opacity:0" class="subscribe-panel">
+    <div style="-webkit-transform:translate3d(0, 20vh, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-moz-transform:translate3d(0, 20vh, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);-ms-transform:translate3d(0, 20vh, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0);transform:translate3d(0, 20vh, 0) scale3d(1, 1, 1) rotateX(0) rotateY(0) rotateZ(0) skew(0, 0)" class="sub-wrapper-border">
+      <div class="sub-wrapper">
+        <div id="w-node-_672e1e9d-8c09-9228-c771-27742ce430ba-1272385b" class="div-block-30">
+          <div id="blenderbin-3d-scene" class="spline-scene-6" data-w-id="b6da8b2d-a242-d6b4-f70c-a41213d89aff" data-animation-type="spline" data-spline-url="https://prod.spline.design/d8TS030gQdSj29ae/scene.splinecode"><canvas></canvas></div>
+        </div>
+        <div class="subscribe-now-wrapper">
+          <div class="div-block-32">
+            <h1>Heading</h1>
+            <p>Lorem ipsum dolor sit amet, consectetur imperdiet. Nunc ut sem vitae risus tristique posuere.</p>
+          </div>
+          <div data-onlogin="hide" class="get-started-wrapper">
+            <a href="sign-up-or-log-in.html" class="button-8 w-button">Get Started</a>
+          </div>
+          <div data-onlogin="show" class="buy-sub-wrapper">
+            <a id="buy-blenderbin-button" href="#" class="button-7 w-button">Buy Subscription</a>
+          </div>
+        </div>
+      </div>
+      <div data-w-id="5abedda2-e63b-4a26-edcf-444932c76105" class="close-sub-panel"><img src="images/close-1.png" loading="lazy" alt=""></div>
+    </div>
+    <div class="terms-and-coniditons-for-sub-panel">
+      <p class="paragraph-11">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse varius enim in eros elementum</p>
+    </div>
+    <div class="points-logo"></div>
+    <div class="camera-plugin-logo"></div>
+    <div class="car-camera-plugin-logo"></div>
+    <div class="create-3d-logo-logo"></div>
+  </div>
+  <div class="profile-panel">
+    <div class="profile_content">
+      <div class="profile_form-wrap w-form">
+        <form id="wf-form-profile-form" name="wf-form-profile-form" data-name="profile form" method="get" data-ms-form="profile" class="profile_form" data-wf-page-id="66b26150a70c22421272385b" data-wf-element-id="38d6b581-b1df-f9eb-638a-9428b29b484e">
+          <div class="profile_edit">
+            <div id="w-node-d227f28b-b842-2809-1090-3390dd446c9a-1272385b" class="div-block-28"></div>
+            <div id="w-node-a062cb22-8a17-6db3-60ea-159666b102f5-1272385b" class="div-block-26">
+              <div class="text-size-medium text-color-alternate text-weight-bold">Edit Profile</div>
+            </div>
+            <div id="w-node-_772b7519-fb00-5cff-4f79-adf6da281322-1272385b" class="div-block-27">
+              <a data-w-id="38d6b581-b1df-f9eb-638a-9428b29b4854" href="#" class="profile_back-icon w-inline-block"><img loading="lazy" src="images/ok-svgrepo-com-1.svg" alt="" class="profile_icon-img"></a>
+            </div>
+          </div>
+          <div class="profile_image-wrap"><img class="profile_image" src="images/average-person-from-different-us-states-v0-i9swhe5lyz7b1.webp" alt="" sizes="100vw" loading="lazy" data-ms-member="profile-image" srcset="images/average-person-from-different-us-states-v0-i9swhe5lyz7b1-p-500.webp 500w, images/average-person-from-different-us-states-v0-i9swhe5lyz7b1.webp 640w">
+            <a data-ms-action="profile-image" href="#" class="profile_image-icon w-inline-block"><img loading="lazy" src="images/photo-camera-svgrepo-com-1.svg" alt="" class="profile_icon-img"></a>
+          </div>
+          <div class="profile_detail-wrap">
+            <div class="profile_detail"><label for="name" class="text-size-small text-color-light-gray">Name</label><input class="profile_form-text-field w-input" maxlength="256" name="name" data-name="Name" placeholder="" type="text" id="name" data-ms-member="name"></div>
+            <div class="profile_detail"><label for="Role" class="text-size-small text-color-light-gray">Role</label><input class="profile_form-text-field w-input" maxlength="256" name="Role" data-name="Role" placeholder="" type="text" id="Role" data-ms-member="role"></div>
+            <div class="profile_detail"><label for="Email" class="text-size-small text-color-light-gray">Email</label><input class="profile_form-text-field w-input" maxlength="256" name="Email" data-name="Email" placeholder="" type="email" id="Email" data-ms-member="email"></div>
+            <div class="profile_detail"><label for="about" class="text-size-small text-color-light-gray">About</label><textarea class="profile_form-text-field w-input" maxlength="5000" name="about" data-name="About" placeholder="" id="about" data-ms-member="about"></textarea></div>
+          </div>
+        </form>
+        <div class="w-form-done">
+          <div>Thank you! Your submission has been received!</div>
+        </div>
+        <div class="w-form-fail">
+          <div>Oops! Something went wrong while submitting the form.</div>
+        </div>
+      </div>
+    </div>
+    <div data-onlogin="subscribed" class="unsub-wrapper">
+      <a id="cancel-subscription-button" href="#" class="unsub-button w-button">Cancel Subscription</a>
+    </div>
+  </div>
+  <div data-w-id="87b390cb-d1b1-0c3c-bf88-f2aec11ee4bb" class="plugin-list">
+    <div class="div-block-47">
+      <a href="plugins/points.html" class="plugin-button w-button">Points</a>
+    </div>
+  </div>
+  <div class="nav-bar">
+    <a href="index.html" class="link-block-copy w-inline-block"><img src="images/white-logo-bb-32px.png" loading="lazy" width="40" alt="" class="image-5"></a>
+    <div class="search-bar-in-nav-bar">
+      <form action="/search" class="search-2 w-form"><input class="search-input-2 w-input" maxlength="256" name="query" placeholder="Search Plugins..." type="search" id="search-2" required=""><input type="submit" class="search-button-2 w-button" value="Search"></form>
+    </div>
+    <div class="div-block-12">
+      <a href="#" class="link-block w-inline-block">
+        <div class="text-block-13">Home</div><img src="images/home-2.png" loading="lazy" sizes="(max-width: 479px) 20.000001907348633px, 100vw" srcset="images/home-2-p-500.png 500w, images/home-2.png 512w" alt="" class="nav-bar-icon home">
+      </a>
+      <div data-w-id="d673f836-fb63-cde5-2071-ffcf4cae081b" class="plugins-nav-button">
+        <div class="plugins-text">Plugins</div><img src="images/puzzle-piece-plugin.png" loading="lazy" alt="" class="nav-bar-icon plugins-button">
+      </div>
+      <a href="#" class="link-block w-inline-block">
+        <div class="docs-text">Docs</div><img src="images/document.png" loading="lazy" sizes="(max-width: 479px) 20.000001907348633px, 100vw" srcset="images/document-p-500.png 500w, images/document.png 512w" alt="" class="nav-bar-icon docs">
+      </a>
+      <a data-onlogin="hide" href="sign-up-or-log-in.html" class="link-block w-inline-block">
+        <div class="sign-up-text">Sign Up</div><img src="images/add-user.png" loading="lazy" sizes="(max-width: 479px) 20.000001907348633px, 100vw" srcset="images/add-user-p-500.png 500w, images/add-user.png 512w" alt="" class="nav-bar-icon sign-up">
+      </a>
+    </div>
+    <a data-issubscribed="false" data-w-id="79bb8092-3145-a088-e703-006edf2885f5" href="#" class="subscribe-button w-inline-block">
+      <div class="subscribe-text">Subscribe</div><img src="images/crown.png" loading="lazy" alt="" class="nav-bar-icon subscribe">
+    </a>
+    <a data-onlogin="show" data-w-id="79bb8092-3145-a088-e703-006edf2885f8" href="#" class="profile w-inline-block"><img src="images/user-3.png" loading="lazy" width="40" height="Auto" alt="" srcset="images/user-3-p-500.png 500w, images/user-3.png 512w" sizes="(max-width: 479px) 37vw, (max-width: 767px) 7vw, 35.000003814697266px" class="image-7"></a>
+    <a id="signout-button" data-onlogin="show" href="#" class="sign-out w-inline-block"><img src="images/right-arrow.png" loading="lazy" width="40" height="Auto" alt="" srcset="images/right-arrow-p-500.png 500w, images/right-arrow.png 512w" sizes="(max-width: 479px) 37vw, (max-width: 767px) 7vw, 35.000003814697266px" class="image-7"></a>
+  </div>
+  <section data-w-id="a7df9ace-e2fc-8da4-2134-d72353084fbc" style="width:100%;height:100vh" class="plugin-introduction-section">
+    <div data-w-id="ecd35bda-5b26-1536-852b-6552aafc6fbe" style="opacity:0;filter:blur(20px)" class="main-header">
+      <div class="text-block-12">SPANKING NEW</div>
+      <h1 class="heading-13">MS Blender Points</h1>
+      <p class="paragraph-7">Graphing physical points to any object, and then some.</p>
+      <div id="plugin-buttons-main" class="div-block-10">
+        <a href="plugins/points.html" class="learn-more-button w-button">Learn More</a>
+        <a href="#" data-issubscribed="false" data-w-id="0e83272d-f5d2-a2e3-b6bf-b92e7f06643c" class="button-5 w-button">See Subscriptions</a>
+      </div>
+    </div>
+    <div data-viewport="show" style="display:block" class="points-particles-scene" data-w-id="80252133-57d4-fe6a-153d-4423d280f5e6" data-animation-type="spline" data-spline-url="https://prod.spline.design/44YAT7vMGu4IFwgB/scene.splinecode"><canvas></canvas></div>
+  </section>
+  <div class="scroll-plugins-wrapper-no-overflow">
+    <section id="w-node-_2991b30d-ad01-3075-d153-c5efd0a410b5-1272385b" class="section-6">
+      <div id="w-node-c93fe370-3bd8-354f-13cd-e533bd4f9bff-1272385b" class="div-block-22">
+        <div class="main-desc"><img src="images/1.png" loading="lazy" width="75" alt="">
+          <h1 class="heading-19">Designed to fix annoyances.</h1>
+          <p class="paragraph-17">The creators for BlenderBin thought of an idea, to bring together a plugin marketplace that focuses on easy plugins that everyone needs, but no one wants to pay for individually. So, we introduced a subscription model.</p>
+          <a href="#" data-w-id="fd101c74-d17e-cb09-a6c2-8ecc2b78a328" class="button-5 w-button">See Subscriptions</a>
+        </div>
+        <div class="where-seen-on">
+          <div class="tusted-clients">
+            <div class="clients-wrapper">
+              <a href="#" class="trusted-client w-inline-block">
+                <h3 class="heading-22 marv-studio">@MARV.OS</h3>
+              </a>
+              <a href="#" class="trusted-client w-inline-block">
+                <h3 class="heading-22 marv-studio">@THEDIZZYVIPER</h3>
+              </a>
+              <a href="#" class="trusted-client w-inline-block">
+                <h3 class="heading-22 marv-studio">@0XVIZION</h3>
+              </a>
+              <a href="#" class="trusted-client w-inline-block">
+                <h3 class="heading-22 marv-studio">@ARTYOMTOGO</h3>
+              </a>
+              <a href="#" class="trusted-client w-inline-block">
+                <h3 class="heading-22 marv-studio">@SKINNY.DESIGNAHH</h3>
+              </a>
+              <a href="#" class="trusted-client w-inline-block">
+                <h3 class="heading-22 marv-studio">@SPACEHEADTR</h3>
+              </a>
+              <a href="#" class="trusted-client w-inline-block">
+                <h3 class="heading-22 marv-studio">@DISNEYPRINCE</h3>
+              </a>
+              <a href="#" class="trusted-client w-inline-block">
+                <h3 class="heading-22 marv-studio">@KYLEC3D</h3>
+              </a>
+              <a href="#" class="trusted-client w-inline-block">
+                <h3 class="heading-22 marv-studio">@POKRASLAMPAS</h3>
+              </a>
+              <a href="#" class="trusted-client w-inline-block">
+                <h3 class="heading-22 marv-studio">@KODYKURTH</h3>
+              </a>
+            </div>
+            <div class="clients-wrapper">
+              <div class="trusted-client"><img loading="lazy" src="images/382232591_158312447335868_1004657346566653845_n__1_-min-removebg-preview-min.png" alt="" class="image-8">
+                <h3 class="heading-22 mvt">Memorable Vacation Travel</h3>
+              </div>
+              <div class="trusted-client"><img loading="lazy" src="images/Gradient_Webinar_Talk_About_Nft_Instagram_Post-removebg-preview-min.png" alt="" class="image-8">
+                <h3 class="heading-22 ethereal-edge">Ethereal Edge</h3>
+              </div>
+              <div class="trusted-client"><img loading="lazy" src="images/avatar.9037958.140x140-min.jpg" alt="" class="image-8 aag">
+                <h3 class="heading-22">Anoushka Art Gallery</h3>
+              </div>
+              <div class="trusted-client"><img width="Auto" height="Auto" alt="" src="images/tlc-logo-min.png" loading="lazy" class="image-8 tlc">
+                <h3 class="heading-22 tlc">TLC</h3>
+              </div>
+              <div class="trusted-client">
+                <h3 class="heading-22 eravista">ERAVISTA</h3>
+              </div>
+              <div class="trusted-client"><img sizes="(max-width: 479px) 100vw, 35.000003814697266px" srcset="images/TripleS_Logo-p-500.png 500w, images/TripleS_Logo-p-800.png 800w, images/TripleS_Logo.png 930w" alt="" src="images/TripleS_Logo.png" loading="lazy" class="image-8">
+                <h3 class="heading-22 sss">Serene Solitude Sanctuary</h3>
+              </div>
+              <div class="trusted-client"><img loading="lazy" src="images/Gradient_Webinar_Talk_About_Nft_Instagram_Post-removebg-preview-min.png" alt="" class="image-8">
+                <h3 class="heading-22 marv-studio">MARV STUDIO</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="information-section-about-blenderbin">
+      <div id="w-node-_37b2bd40-c132-3fe7-988d-492762d4910f-1272385b" class="div-block-53">
+        <div id="w-node-_34ae333e-6a18-5b57-538c-717d488d6b83-1272385b" class="gain-all-plugins-and-new-releases-picture">
+          <div class="div-block-51"></div>
+        </div>
+      </div>
+      <div class="div-block-18">
+        <div class="div-block-33-copy">
+          <h1 class="heading-19">Gain all our plugins, and new releases.</h1>
+          <p class="paragraph-16">Our subscription was meant for plugins that can help you in little ways; so enjoy paying for one thing, and having it all.</p>
+          <a href="#" class="button-9 w-button">View All Plugins</a>
+        </div>
+      </div>
+    </section>
+    <section id="w-node-_1f156fe8-7af1-7a5a-7cb9-ff34dc90cac3-1272385b" class="video-introduction-section">
+      <div id="w-node-_1f156fe8-7af1-7a5a-7cb9-ff34dc90cac4-1272385b" class="video-description-panel">
+        <div class="div-block-33-copy">
+          <h1 class="heading-19">Experience ease like never before.</h1>
+          <p class="paragraph-15">Easy, user-friendly Blender UI to help you with complex projects, without having to put the complex in complex. </p>
+          <a href="#plugin-preview-section" class="view-plugin-example w-button">View Plugin Preview</a>
+        </div>
+      </div>
+      <div class="video-panel">
+        <div data-video-urls="" data-autoplay="true" data-loop="true" data-wf-ignore="true" class="background-video w-background-video w-background-video-atom"><video id="b3230dbb-3de9-8144-110c-1ad29162b13b-video" autoplay="" loop="" muted="" playsinline="" data-wf-ignore="true" data-object-fit="cover"></video><noscript>
+            <style>
+  [data-wf-bgvideo-fallback-img] {
+    display: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-wf-bgvideo-fallback-img] {
+      position: absolute;
+      z-index: -100;
+      display: inline-block;
+      height: 100%;
+      width: 100%;
+      object-fit: cover;
+    }
+  }</style><img data-wf-bgvideo-fallback-img="true" alt="">
+          </noscript>
+          <div aria-live="polite"><button type="button" data-w-bg-video-control="true" aria-controls="b3230dbb-3de9-8144-110c-1ad29162b13b-video" class="w-backgroundvideo-backgroundvideoplaypausebutton w-background-video--control"><span><img src="https://uploads-ssl.webflow.com/6022af993a6b2191db3ed10c/628299f8aa233b83918e24fd_Pause.svg" loading="lazy" alt="Pause video"></span><span hidden=""><img loading="lazy" alt="Play video" src="https://uploads-ssl.webflow.com/6022af993a6b2191db3ed10c/628298b20ae0236682d4b87f_Play-24.svg"></span></button></div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <section id="plugin-preview-section" data-w-id="7793290a-e537-1d83-f2e7-8b01bfbb3e4c" style="width:100%;height:80vh" class="interactive-scene w-node-_7793290a-e537-1d83-f2e7-8b01bfbb3e4c-1272385b">
+    <div id="w-node-_86194730-e384-68bc-c4da-f4cd7645876a-1272385b" class="_3d-interactive-panel">
+      <div class="_3d-preview-three-js">
+        <div class="div-block-38">
+          <h1 class="heading-23">Try out our newest plugin.</h1>
+          <p class="paragraph-12">Straight from the python file itself, but we had to recreate the UI you interact with. Go ham on the Kevin cube!</p>
+          <a href="plugins/points.html" class="learn-more-button w-button">Learn More</a>
+        </div>
+        <div data-viewport="show" class="three-js-scene-for-cube w-embed w-script">
+          <style>
+    /* Parent container to hold the entire scene */
+    #container {
+        width: 100%;
+        height: 100vh;
+        position: relative;
+        overflow: hidden;
+    }
+    /* Control panel styling */
+    #controls {
+        position: absolute;
+        top: 20%;
+        right: 20%;
+        padding: 10px;
+        background-color: #2c2c2c;
+        border-radius: 4px;
+        z-index: 10;
+        color: white;
+        font-family: 'Arial', sans-serif;
+        width: 200px;
+    }
+    label {
+        display: block;
+        margin-bottom: 5px;
+        color: #b0b0b0;
+        font-size: 12px;
+    }
+    /* Input fields */
+    input[type="number"] {
+        width: 100%;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        padding: 5px;
+        border: 1px solid #555;
+        background-color: #3c3c3c;
+        color: white;
+        font-size: 12px;
+        box-sizing: border-box;
+    }
+    /* Buttons */
+    #distribute-points, #reset, #return {
+        padding: 5px;
+        background-color: #4d4d4d;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        width: 100%;
+        font-size: 12px;
+        margin-bottom: 5px;
+    }
+    #distribute-points:hover, #reset:hover, #return:hover {
+        background-color: #606060;
+    }
+    #enable-points {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    #enable-points label {
+        margin-left: 5px;
+    }
+    /* Canvas styling */
+    canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain; /* Ensure the canvas fits within its container without stretching */
+    }
+</style>
+          <div id="container">
+            <div id="controls">
+              <label for="density">Density</label>
+              <input type="number" id="density" value="25" min="1" max="1000000">
+              <label for="radius">Point Size</label>
+              <input type="number" id="radius" value="0.04" step="0.01" min="0.01" max="10">
+              <label for="seed">Random Seed</label>
+              <input type="number" id="seed" value="0" min="0" max="100">
+              <div id="enable-points">
+                <input type="checkbox" id="enable-points-checkbox">
+                <label for="enable-points-checkbox">Enable Points Instancing</label>
+              </div>
+              <button id="distribute-points">Distribute Points</button>
+              <button id="reset">Reset</button>
+              <button id="return">Return</button>
+            </div>
+          </div>
+          <script type="module">
+    import * as THREE from 'https://cdn.skypack.dev/three@0.128.0/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.skypack.dev/three@0.128.0/examples/jsm/controls/OrbitControls.js';
+    function seededRandom(seed) {
+        var x = Math.sin(seed++) * 10000;
+        return x - Math.floor(x);
+    }
+    const container = document.getElementById('container');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: false });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.25;
+    controls.enableZoom = true;
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(3, 10, 3);
+    directionalLight.target.position.set(0, 0, 0);
+    directionalLight.castShadow = true;
+    scene.add(directionalLight);
+    scene.add(directionalLight.target);
+    directionalLight.shadow.mapSize.width = 1024;
+    directionalLight.shadow.mapSize.height = 1024;
+    directionalLight.shadow.camera.near = 0.1;
+    directionalLight.shadow.camera.far = 50;
+    directionalLight.shadow.camera.left = -5;
+    directionalLight.shadow.camera.right = 5;
+    directionalLight.shadow.camera.top = 5;
+    directionalLight.shadow.camera.bottom = -5;
+    const planeGeometry = new THREE.PlaneGeometry(10, 10);
+    const planeMaterial = new THREE.ShadowMaterial({ color: 0x000000, opacity: 0.5 });
+    const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.y = -1;
+    plane.receiveShadow = true;
+    scene.add(plane);
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshStandardMaterial({ color: 0x808080 });
+    const cube = new THREE.Mesh(geometry, material);
+    cube.castShadow = true;
+    scene.add(cube);
+    camera.position.set(3, 3, 3);
+    controls.target.set(0, 0, 0);
+    controls.update();
+    const animate = function () {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    };
+    animate();
+    let pointsMaterial = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.04,
+        sizeAttenuation: true,
+        map: new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png'),
+        alphaTest: 0.5,
+        transparent: true,
+    });
+    const distributePoints = () => {
+        const density = parseInt(document.getElementById('density').value);
+        const radius = parseFloat(document.getElementById('radius').value);
+        const seed = parseInt(document.getElementById('seed').value);
+        const cubeSize = 1;
+        pointsMaterial.size = radius;
+        const pointsGeometry = new THREE.BufferGeometry();
+        const points = [];
+        for (let i = 0; i < density * 100; i++) {
+            const x = seededRandom(seed + i) * cubeSize - cubeSize / 2;
+            const y = seededRandom(seed + i + 1) * cubeSize - cubeSize / 2;
+            const z = seededRandom(seed + i + 2) * cubeSize - cubeSize / 2;
+            if (Math.abs(x) > cubeSize / 2 - 0.1 || Math.abs(y) > cubeSize / 2 - 0.1 || Math.abs(z) > cubeSize / 2 - 0.1) {
+                points.push(x, y, z);
+            }
+        }
+        pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+        const pointsObject = new THREE.Points(pointsGeometry, pointsMaterial);
+        while (scene.children.length > 0) {
+            scene.remove(scene.children[0]);
+        }
+        scene.add(pointsObject);
+    };
+    document.getElementById('distribute-points').addEventListener('click', distributePoints);
+    window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+</script>
+        </div>
+        <a data-w-id="4aa7168e-56c3-7923-b818-9db463d1cf63" style="opacity:0;display:none" href="#" class="back-button-for-interactive-section w-inline-block"><img src="images/arrow.png" loading="lazy" sizes="(max-width: 479px) 50vw, 49.98652648925781px" srcset="images/arrow-p-500.png 500w, images/arrow.png 512w" alt="" class="image-10"></a>
+        <a data-w-id="72c2d531-34e3-9385-1c27-47f8a17680a5" style="display:flex;opacity:1" href="#plugin-preview-section" class="interaction-div-for-interactive-container w-inline-block"><img src="images/hand-pointer.png" loading="lazy" width="50" alt="" class="image-9"></a>
+      </div>
+    </div>
+  </section>
+  <section class="section-4">
+    <div id="w-node-_50244a9e-2b24-ff09-42ac-04e4886161a0-1272385b" class="div-block-22">
+      <div class="div-block-33">
+        <h1 class="heading-19">Little elves that make life easier.</h1>
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse varius enim in eros elementum tristique. Duis cursus, mi quis viverra ornare, eros dolor interdum nulla, ut commodo diam libero vitae erat. Aenean faucibus nibh et justo cursus id rutrum lorem imperdiet. Nunc ut sem vitae risus tristique posuere.</p>
+        <a href="https://www.blenderbin.com/search" class="button-9 w-button">View All Plugins</a>
+      </div>
+    </div>
+  </section>
+  <section class="coming-soon-section">
+    <div id="w-node-_915cad32-71b5-9b71-aedc-238588bfcebd-1272385b" class="become-a-creator-panel">
+      <div class="div-block-33-copy">
+        <h1 class="heading-19">Become a Creator.</h1>
+        <p>Partner with us, and make your own plugin for the people. We create the page, and you get paid.</p>
+        <a href="#" class="button-9 coming-soon w-button">Coming Soon</a>
+      </div>
+    </div>
+    <div class="game-rewards-panel">
+      <div class="div-block-33-copy">
+        <h1 class="heading-19">Gamification Rewards</h1>
+        <p>Earn points through referrals and social media sharing to be given prizes and discounts, even free months!</p>
+        <a href="#" class="button-9 coming-soon w-button">Coming Soon</a>
+      </div>
+    </div>
+  </section>
+  <section class="section-2">
+    <div id="w-node-a98b4510-b8d7-ed03-07ca-6ee9cc058ac9-1272385b" class="final-conclusion-panel">
+      <div class="div-block-33">
+        <h1 class="heading-19">Little elves that make life easier.</h1>
+        <p class="paragraph-14">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse varius enim in eros elementum tristique. Duis cursus, mi quis viverra ornare, eros dolor interdum nulla, </p>
+        <a href="https://www.blenderbin.com/search" class="button-9 w-button">View All Plugins</a>
+      </div>
+    </div>
+  </section>
+  <section class="footer-blenderbin">
+    <div class="footer-wrapper">
+      <div id="w-node-e14569fa-b22b-9e94-840b-714f3117b58e-1272385b" class="div-block-34">
+        <h1 class="heading-20">Join Us.</h1>
+      </div>
+      <div id="w-node-_0be402e7-d820-1f94-891b-0dcf8742e0d2-1272385b" class="div-block-35">
+        <p class="paragraph-13">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse varius enim in eros elementum tristique. Duis cursus, mi quis viverra ornare, eros dolor interdum nulla, ut commodo diam libero vitae erat. Aenean faucibus nibh et justo cursus id rutrum lorem imperdiet. Nunc ut sem vitae risus tristique posuere.</p>
+        <a href="#" class="button-9 w-button">Coming Soon</a>
+      </div>
+    </div>
+  </section>
+  <section class="empty-space-section"></section>
+  <a href="http://webrend.com" target="_blank" class="webrend-watermark-2 w-inline-block"><img loading="lazy" src="images/W-letter-for-webrend-min.png" alt="" class="image-2">
+    <h4 class="heading-18">WebRend</h4>
+  </a>
+  <script src="https://d3e54v103j8qbb.cloudfront.net/js/jquery-3.5.1.min.dc5e7f18c8.js?site=66b26150a70c224212723855" type="text/javascript" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
+  <script src="js/some-blender-plugin-market-49392.js" type="text/javascript"></script>
+</body>
+</html>
