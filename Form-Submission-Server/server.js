@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const nodemailer = require('nodemailer');
 const path = require('path');
+require('dotenv').config(); // Load environment variables
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -13,29 +14,29 @@ app.use(bodyParser.json());
 // Serve static files (e.g., HTML, CSS, JS)
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Create a transporter object using your SMTP server
+let transporter = nodemailer.createTransport({
+    host: 'smtp.yourdomain.com', // Replace with your SMTP server
+    port: 587,                   // Use 465 for secure connection
+    secure: false,              // Use true for port 465
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
 // Route to handle form submission
 app.post('/submit-email', async (req, res) => {
     const { email } = req.body;
 
-    // Create a transporter object using SMTP transport
-    let transporter = nodemailer.createTransport({
-        service: 'Gmail', // or another email service
-        auth: {
-            user: process.env.EMAIL_USER, // your email address
-            pass: process.env.EMAIL_PASS  // your email password
-        }
-    });
-
-    // Email options
     let mailOptions = {
         from: process.env.EMAIL_USER,
-        to: 'recipient@example.com', // recipient's email address
+        to: 'recipient@example.com',
         subject: 'New Subscriber',
         text: `New subscriber email: ${email}`
     };
 
     try {
-        // Send the email
         await transporter.sendMail(mailOptions);
         res.send('Thank you for subscribing!');
     } catch (error) {
@@ -47,4 +48,5 @@ app.post('/submit-email', async (req, res) => {
 app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);
 });
+
 
